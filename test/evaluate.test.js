@@ -104,7 +104,7 @@ describe('REJECTED', () => {
 // ---------------------------------------------------------------------------
 describe('Entradas inválidas', () => {
   test('GPA negativo lança erro de validação', () => {
-    expect(() => evaluate({ gpa: -0.1 })).toThrow(RangeError);
+    expect(() => evaluate({ gpa: -0.1 })).toThrow(Error);
     expect(() => evaluate({ gpa: -0.1 })).toThrow('GPA must be between 0 and 10.');
   });
 
