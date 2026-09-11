@@ -1,0 +1,30 @@
+{
+  "name": "scholarship-eligibility-evaluator-tests",
+  "version": "1.0.0",
+  "description": "Suíte de testes automatizados e análise de mutação para o Scholarship Eligibility Evaluator (JavaScript)",
+  "main": "src/ScholarshipEligibilityEvaluator.js",
+  "scripts": {
+    "test": "jest --coverage",
+    "mutation": "stryker run"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/jest-runner": "^8.7.1",
+    "jest": "^29.7.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IsabelleTenorio/APS-Testes-automatizados.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/IsabelleTenorio/APS-Testes-automatizados/issues"
+  },
+  "homepage": "https://github.com/IsabelleTenorio/APS-Testes-automatizados#readme"
+}
