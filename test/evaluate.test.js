@@ -2,7 +2,8 @@
 
 const { evaluateScholarship, Status } = require('../src/ScholarshipEligibilityEvaluator');
 
-// Base values
+// Valores "base" que satisfazem todas as regras, usados como ponto de partida
+// para isolar cada regra nos testes (técnica de "one variable at a time").
 const BASE = {
   age: 20,
   gpa: 8.0,
@@ -17,6 +18,24 @@ function evaluate(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Contrato do enum Status
+//
+// Motivo: a análise de mutação revelou que nenhum teste comparava os valores
+// de `status` com os literais exigidos pela especificação ("APPROVED",
+// "REJECTED", "MANUAL_REVIEW") — todas as asserções usavam a própria
+// constante `Status.X`, então uma mutação que esvaziasse esses literais
+// (ex.: Status.APPROVED = '') não era detectada por nenhum teste, mesmo com
+// 100% de cobertura de linha/branch nessas comparações.
+// ---------------------------------------------------------------------------
+describe('Contrato do enum Status', () => {
+  test('os valores do enum Status correspondem exatamente à especificação', () => {
+    expect(Status.APPROVED).toBe('APPROVED');
+    expect(Status.REJECTED).toBe('REJECTED');
+    expect(Status.MANUAL_REVIEW).toBe('MANUAL_REVIEW');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // APPROVED (>= 1 exigido)
 // ---------------------------------------------------------------------------
 describe('APPROVED', () => {
@@ -28,7 +47,7 @@ describe('APPROVED', () => {
 });
 
 // ---------------------------------------------------------------------------
-// MANUAL_REVIEW (>= 1)
+// MANUAL_REVIEW (>= 1 exigido)
 // ---------------------------------------------------------------------------
 describe('MANUAL_REVIEW', () => {
   test('idade entre 16 e 17 gera revisão manual', () => {
@@ -48,7 +67,7 @@ describe('MANUAL_REVIEW', () => {
 });
 
 // ---------------------------------------------------------------------------
-// REJECTED (>= 3)
+// REJECTED (>= 3 exigidos, motivos diferentes)
 // ---------------------------------------------------------------------------
 describe('REJECTED', () => {
   test('idade abaixo do mínimo é rejeitada', () => {
@@ -100,7 +119,7 @@ describe('REJECTED', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Entradas inválidas (>= 2)
+// Entradas inválidas (>= 2 exigidos)
 // ---------------------------------------------------------------------------
 describe('Entradas inválidas', () => {
   test('GPA negativo lança erro de validação', () => {
@@ -166,10 +185,14 @@ describe('Valores de fronteira', () => {
       expect(evaluate({ attendanceRate: 74.99 }).status).toBe(Status.REJECTED);
     });
     test('attendanceRate=75 -> revisão (limite inferior inclusivo)', () => {
-      expect(evaluate({ attendanceRate: 75 }).status).toBe(Status.MANUAL_REVIEW);
+      const result = evaluate({ attendanceRate: 75 });
+      expect(result.status).toBe(Status.MANUAL_REVIEW);
+      expect(result.reasons).toEqual(['Attendance rate is in the manual review range.']);
     });
     test('attendanceRate=79.99 -> revisão (último valor antes de aprovar)', () => {
-      expect(evaluate({ attendanceRate: 79.99 }).status).toBe(Status.MANUAL_REVIEW);
+      const result = evaluate({ attendanceRate: 79.99 });
+      expect(result.status).toBe(Status.MANUAL_REVIEW);
+      expect(result.reasons).toEqual(['Attendance rate is in the manual review range.']);
     });
     test('attendanceRate=80 -> não gera motivo de frequência (aprovável)', () => {
       expect(evaluate({ attendanceRate: 80 }).status).toBe(Status.APPROVED);
@@ -182,7 +205,7 @@ describe('Valores de fronteira', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Additional structural paths (independent Boolean decisions)
+// Caminhos estruturais adicionais (decisões booleanas independentes)
 // ---------------------------------------------------------------------------
 describe('Caminhos estruturais - regras booleanas', () => {
   test.each([
