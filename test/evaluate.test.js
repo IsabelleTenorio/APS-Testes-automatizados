@@ -19,13 +19,6 @@ function evaluate(overrides = {}) {
 
 // ---------------------------------------------------------------------------
 // Contrato do enum Status
-//
-// Motivo: a análise de mutação revelou que nenhum teste comparava os valores
-// de `status` com os literais exigidos pela especificação ("APPROVED",
-// "REJECTED", "MANUAL_REVIEW") — todas as asserções usavam a própria
-// constante `Status.X`, então uma mutação que esvaziasse esses literais
-// (ex.: Status.APPROVED = '') não era detectada por nenhum teste, mesmo com
-// 100% de cobertura de linha/branch nessas comparações.
 // ---------------------------------------------------------------------------
 describe('Contrato do enum Status', () => {
   test('os valores do enum Status correspondem exatamente à especificação', () => {
@@ -36,7 +29,7 @@ describe('Contrato do enum Status', () => {
 });
 
 // ---------------------------------------------------------------------------
-// APPROVED (>= 1 exigido)
+// APPROVED
 // ---------------------------------------------------------------------------
 describe('APPROVED', () => {
   test('candidato que atende a todos os critérios é aprovado', () => {
@@ -47,7 +40,7 @@ describe('APPROVED', () => {
 });
 
 // ---------------------------------------------------------------------------
-// MANUAL_REVIEW (>= 1 exigido)
+// MANUAL_REVIEW
 // ---------------------------------------------------------------------------
 describe('MANUAL_REVIEW', () => {
   test('idade entre 16 e 17 gera revisão manual', () => {
@@ -64,10 +57,20 @@ describe('MANUAL_REVIEW', () => {
       'GPA is in the manual review range.',
     ]);
   });
+
+  test('todos os motivos de revisão são acumulados simultaneamente (idade + GPA + frequência)', () => {
+    const result = evaluate({ age: 16, gpa: 6.5, attendanceRate: 77.0 });
+    expect(result.status).toBe(Status.MANUAL_REVIEW);
+    expect(result.reasons).toEqual([
+      'Applicant is under 18 and requires manual review.',
+      'GPA is in the manual review range.',
+      'Attendance rate is in the manual review range.',
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// REJECTED (>= 3 exigidos, motivos diferentes)
+// REJECTED
 // ---------------------------------------------------------------------------
 describe('REJECTED', () => {
   test('idade abaixo do mínimo é rejeitada', () => {
@@ -100,11 +103,16 @@ describe('REJECTED', () => {
     expect(result.reasons).toEqual(['Applicant has a disciplinary record.']);
   });
 
-  test('rejeição tem prioridade sobre revisão quando ambas ocorrem', () => {
-    // idade em faixa de revisão (17) + GPA em faixa de rejeição (5.5)
+  test('rejeição tem prioridade sobre revisão quando ambas ocorrem (idade + GPA)', () => {
     const result = evaluate({ age: 17, gpa: 5.5 });
     expect(result.status).toBe(Status.REJECTED);
     expect(result.reasons).toEqual(['GPA is below the minimum required.']);
+  });
+
+  test('rejeição tem prioridade sobre revisão quando ocorre com frequência insuficiente', () => {
+    const result = evaluate({ age: 16, attendanceRate: 70.0 });
+    expect(result.status).toBe(Status.REJECTED);
+    expect(result.reasons).toEqual(['Attendance rate is below the minimum required.']);
   });
 
   test('múltiplos motivos de rejeição são acumulados', () => {
@@ -119,11 +127,10 @@ describe('REJECTED', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Entradas inválidas (>= 2 exigidos)
+// Entradas inválidas
 // ---------------------------------------------------------------------------
 describe('Entradas inválidas', () => {
   test('GPA negativo lança erro de validação', () => {
-    expect(() => evaluate({ gpa: -0.1 })).toThrow(Error);
     expect(() => evaluate({ gpa: -0.1 })).toThrow('GPA must be between 0 and 10.');
   });
 
@@ -138,10 +145,16 @@ describe('Entradas inválidas', () => {
   test('frequência acima de 100 lança erro de validação', () => {
     expect(() => evaluate({ attendanceRate: 100.1 })).toThrow('Attendance rate must be between 0 and 100.');
   });
+
+  test('idade negativa é tratada pela regra de idade mínima (REJECTED)', () => {
+    const result = evaluate({ age: -1 });
+    expect(result.status).toBe(Status.REJECTED);
+    expect(result.reasons).toEqual(['Applicant is younger than the minimum age.']);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Valores de fronteira (>= 4 exigidos) — classes: idade, GPA, frequência
+// Valores de fronteira: elimina mutantes ROR (>=, >, <=, <)
 // ---------------------------------------------------------------------------
 describe('Valores de fronteira', () => {
   describe('Idade (limiares: 16, 18)', () => {
@@ -205,9 +218,9 @@ describe('Valores de fronteira', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Caminhos estruturais adicionais (decisões booleanas independentes)
+// Caminhos estruturais adicionais: elimina mutantes LCR (&&, ||)
 // ---------------------------------------------------------------------------
-describe('Caminhos estruturais - regras booleanas', () => {
+describe('Caminhos estruturais - regras booleanas e combinações', () => {
   test.each([
     [true, false, Status.APPROVED],
     [false, false, Status.REJECTED],
@@ -216,5 +229,17 @@ describe('Caminhos estruturais - regras booleanas', () => {
   ])('hasRequiredCourses=%s, disciplinaryRecord=%s -> %s', (hasRequiredCourses, disciplinaryRecord, expected) => {
     const result = evaluate({ hasRequiredCourses, disciplinaryRecord });
     expect(result.status).toBe(expected);
+  });
+
+  test('GPA em aprovação + Frequência em revisão -> MANUAL_REVIEW', () => {
+    const result = evaluate({ gpa: 8.5, attendanceRate: 77.0 });
+    expect(result.status).toBe(Status.MANUAL_REVIEW);
+    expect(result.reasons).toEqual(['Attendance rate is in the manual review range.']);
+  });
+
+  test('GPA em revisão + Frequência em aprovação -> MANUAL_REVIEW', () => {
+    const result = evaluate({ gpa: 6.5, attendanceRate: 85.0 });
+    expect(result.status).toBe(Status.MANUAL_REVIEW);
+    expect(result.reasons).toEqual(['GPA is in the manual review range.']);
   });
 });
